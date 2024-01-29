@@ -1,15 +1,16 @@
 import pandas as pd # The pandas library for data analysis and manipulation.
 import requests as requests # Requests for making network connections.
 from bs4 import BeautifulSoup # For extracting data from HTML and XML docs.
-from natsort import index_natsorted
+# from natsort import index_natsorted
 
 
 def user_selection():
     print("\n\nChoose the next selection: ")
-    print("1. Sort shops")
-    print("2. List shop's popular items")
-    print("3. Search another city")
-    print("4: Exit")
+    print("1: Sort shops")
+    print("2: List shop's popular items")
+    print("3: Search another city")
+    print("4: Export results to file")
+    print("5: Exit")
     option = input("Option: ")
     return int(option)
 
@@ -49,7 +50,6 @@ def top_results(beautifulsoup):
 def export_results(raw_data):
     dataframe = pd.DataFrame(raw_data, columns = ['Store', 'Rating', 'Reviews'])
     dataframe.index += 1
-    # dataframe.to_csv('raw_data.csv', index=False)
     print(dataframe)
     return dataframe
 
@@ -61,16 +61,19 @@ def store_data(beautifulsoup):
     reviews = []
     for store in beautifulsoup.find_all('li', 'css-1qn0b6x'):
         name = store.find('a', 'css-19v1rkv')
+        
         rating = store.find('span', 'css-gutk1c')
         review = store.find('span', 'css-chan6m')
         if(name != None):
+            urls.append(("https://www.yelp.com"+name.get('href')))
             names.append(name.get_text())
             ratings.append(rating.get_text())
             reviews.append(review.get_text())
     raw_data={
         'Store':names,
         'Rating':ratings,
-        'Reviews':reviews
+        'Reviews':reviews,
+        'URLS': urls
     }
     return raw_data
     
@@ -86,18 +89,19 @@ def shop_search():
 
     dataframe = export_results(raw_data)
     selection = user_selection()
-    while(selection < 4):
+    while(selection < 5):
         if(selection == 1):
             filter = user_input("sort")
             if(filter.strip() == "Highest Rated"):
                 # print(dataframe.Rating.to_string(index=False))
-                dataframe = dataframe.sort_values(by='Rating', ascending=False)
+                sorted_dataframe = dataframe
+                sorted_dataframe = sorted_dataframe.sort_values(by='Rating', ascending=False)
+                sorted_dataframe = sorted_dataframe.reset_index(drop=True)
+                sorted_dataframe.index += 1
+                print(sorted_dataframe)
             elif(filter == "Most Reviewed"):
                 # need to modify the sorting key
-                # for r in dataframe['Store']:
-                #     print(dataframe[r])
                 size = dataframe[dataframe.columns[0]].count()
-                # dataframe['Reviews'].replace({'K': '*1e3', 'M': '*1e6'}, regex=True).map(pd.eval).astype(int)
                 print(dataframe)
                 for i in range(size):
                     # (df.Val.replace(r'[KM]+$', '', regex=True).astype(float) * df.Val.str.extract(r'[\d\.]+([KM]+)', expand=False).fillna(1).replace(['K','M'], [10**3, 10**6]).astype(int))
@@ -110,24 +114,30 @@ def shop_search():
                     print(string_value)
                 print(dataframe.Reviews.to_string(index=False))
                 dataframe['Reviews'].replace({'[kK]': '*1e3', 'm': '*1e6'}, regex=True)
-           
-            
-            
 
-
-
-                # dataframe.iloc[:, 2:] = 1
-                # print(dataframe)
-                # https://github.com/SethMMorton/natsort?tab=readme-ov-file#sorting-by-real-numbers-i-e-signed-floats
                 # dataframe = dataframe.sort_values(by='Reviews', ascending=False, key=lambda x: np.argsort(index_natsorted(dataframe["Reviews"])))
                 # dataframe = dataframe.sort_values(by = "Reviews", ascending=False)
                 print(dataframe.Reviews.to_string(index=False))
-            dataframe = dataframe.reset_index(drop=True)
-            dataframe.index += 1
-            print(dataframe)
+                dataframe = dataframe.reset_index(drop=True)
+                dataframe.index += 1
+                print(dataframe)
         elif(selection == 2):
-            print("listing popular items...")
-        else:
+            export_results(raw_data)
+            store_number = input("Select Store Number: ")
+            store_number = int(store_number)
+            print("\n", dataframe.iloc[[store_number-1]])
+            store_url = raw_data['URLS'][store_number-1]
+            
+            print("Retrieving List... ")
+            
+            fetched_url = requests.get(store_url)
+            beautifulsoup = BeautifulSoup(fetched_url.text, "html.parser")
+            print("\nPopular Items: ")
+            counter = 1
+            for item in beautifulsoup.find_all('p', 'css-nyjpex'):
+                print(str(counter)+ ":", item.get_text())
+                counter += 1
+        elif(selection == 3):
             location = user_input("city")
             fetched_url = requests.get(build_url(location))
             # print(fetched_url)
@@ -135,6 +145,9 @@ def shop_search():
             raw_data = store_data(beautifulsoup)
             dataframe = export_results(raw_data)
             # top_results(beautifulsoup)
+            print("Exported!")
+        else:
+            dataframe.to_csv('Tea_Shop_List.csv', index=False)
         selection = user_selection()
     
     print("Goodbye!")
