@@ -108,6 +108,22 @@ def shop_search():
                 size = dataframe[dataframe.columns[0]].count()
                 print(dataframe)
                 for i in range(size):
+                    value = dataframe.iloc[i, 2]
+                    string_value = (value.split()[0])[1:]
+                    dataframe.iloc[i, 2] = string_value
+
+
+
+                dataframe.Reviews =  (dataframe.Reviews.replace(r'[kKmM]+$', '', regex=True).astype(float) * \
+                    dataframe.Reviews.str.extract(r'[\d\.]+([kKmM]+)', expand=False)
+                    .fillna(1)
+                    .replace(['k','m'], [10**3, 10**6]).astype(int))
+
+
+                """
+                size = dataframe[dataframe.columns[0]].count()
+                print(dataframe)
+                for i in range(size):
                     # (df.Val.replace(r'[KM]+$', '', regex=True).astype(float) * df.Val.str.extract(r'[\d\.]+([KM]+)', expand=False).fillna(1).replace(['K','M'], [10**3, 10**6]).astype(int))
                     
                     
@@ -121,6 +137,7 @@ def shop_search():
 
                 # dataframe = dataframe.sort_values(by='Reviews', ascending=False, key=lambda x: np.argsort(index_natsorted(dataframe["Reviews"])))
                 # dataframe = dataframe.sort_values(by = "Reviews", ascending=False)
+                """
                 print(dataframe.Reviews.to_string(index=False))
                 dataframe = dataframe.reset_index(drop=True)
                 dataframe.index += 1
