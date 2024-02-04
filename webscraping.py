@@ -1,7 +1,7 @@
 import pandas as pd # The pandas library for data analysis and manipulation.
 import requests as requests # Requests for making network connections.
 from bs4 import BeautifulSoup # For extracting data from HTML and XML docs.
-# from natsort import index_natsorted
+import time
 
 
 def user_selection():
@@ -35,18 +35,11 @@ def build_url(location):
         string_location = "+".join(split_location)
     else:
         string_location = location
+    
     url_location = "https://www.yelp.com/search?find_desc=tea&find_loc=" + string_location +"%2C+CA"
     return url_location
 
-# def top_results(beautifulsoup):
-#     '''Displays the '''
-#     counter = 1
-#     print("Top Results:")
-#     for shop in beautifulsoup.find_all('a', 'css-19v1rkv'):
-#         name = shop.string #shop name
-#         if( name != "Yelp" and name != "Food"):
-#             print(counter, ": ", name)
-#             counter += 1
+
 
 def export_results(raw_data):
     '''Uses the data created to add it to a dataframe'''
@@ -78,97 +71,97 @@ def store_data(beautifulsoup):
         'URLS': urls
     }
     return raw_data
-    
 
 
-def shop_search():
+def sort_highest_rated(dataframe):
+    '''Sort stores by the highest ratings and display results'''
+    # print(dataframe.Rating.to_string(index=False))
+    dataframe = dataframe.sort_values(by='Rating', ascending=False)
+    dataframe = dataframe.reset_index(drop=True)
+    dataframe.index += 1
+    print(dataframe)
+
+
+def sort_most_reviewed(dataframe):
+    '''Sort stores by the most reviewed and display results'''
+    size = dataframe[dataframe.columns[0]].count()
+    # print(dataframe)
+    for i in range(size):
+        value = dataframe.iloc[i, 2]
+        string_value = (value.split()[0])[1:]
+        dataframe.iloc[i, 2] = string_value
+    dataframe.Reviews =  (dataframe.Reviews.replace(r'[kKmM]+$', '', regex=True).astype(float) * \
+        dataframe.Reviews.str.extract(r'[\d\.]+([kKmM]+)', expand=False)
+        .fillna(1)
+        .replace(['k','m'], [10**3, 10**6]).astype(int))
+    dataframe = dataframe.sort_values(by = "Reviews", ascending=False)
+    dataframe = dataframe.reset_index(drop=True)
+    for i in range(size):
+        value = dataframe.iloc[i, 2]
+        # string_value = (value.split()[0])[1:]
+        dataframe.iloc[i, 2] = "(" + str(int(value)) + " reviews)"
+    dataframe.index += 1
+    print(dataframe)
+
+
+
+def store_popular_items(raw_data, dataframe):
+    '''Search for store's popular items and display results'''
+    export_results(raw_data)
+    store_number = int(input("Select Store Number: "))
+    print("\n", dataframe.iloc[[store_number-1]])
+    store_url = raw_data['URLS'][store_number-1]
+    print("Retrieving List... ")
+    fetched_url = requests.get(store_url)
+    beautifulsoup = BeautifulSoup(fetched_url.text, "html.parser")
+    time.sleep(5)
+    print("\nPopular Items: ")
+    counter = 1
+    for item in beautifulsoup.find_all('p', 'css-nyjpex'):
+        print(str(counter)+ ":", item.get_text())
+        counter += 1
+
+
+def search_city_html():
+    '''Retrieve user input of city selected and create a beautiful object from it'''
     location = user_input("city")
     fetched_url = requests.get(build_url(location))
     beautifulsoup = BeautifulSoup(fetched_url.text, "html.parser")
-    raw_data = store_data(beautifulsoup)
-    dataframe = export_results(raw_data)
-    selection = user_selection()
+    return beautifulsoup
+    
+
+
+
+
+def shop_search():
+    '''Main function that interacts with the user to retrieve their selection and return the results'''
+    raw_data = {}
+    dataframe = pd.DataFrame()
+    selection = 3
+
     while(selection < 5):
         if(selection == 1):
             filter = user_input("sort")
             if(filter.strip() == "Highest Rated"):
                 '''Highest Rated allows the user to see the stores ranked with highest ratings first'''
-                # print(dataframe.Rating.to_string(index=False))
-                sorted_dataframe = dataframe
-                sorted_dataframe = sorted_dataframe.sort_values(by='Rating', ascending=False)
-                sorted_dataframe = sorted_dataframe.reset_index(drop=True)
-                sorted_dataframe.index += 1
-                print(sorted_dataframe)
+                sort_highest_rated(dataframe)
 
-
-                
             elif(filter == "Most Reviewed"):
                 '''Most Reviewed allows the user to see the stores ranked with highest reviews first'''
-                # need to modify the sorting key
-                size = dataframe[dataframe.columns[0]].count()
-                print(dataframe)
-                for i in range(size):
-                    value = dataframe.iloc[i, 2]
-                    string_value = (value.split()[0])[1:]
-                    dataframe.iloc[i, 2] = string_value
-
-
-
-                dataframe.Reviews =  (dataframe.Reviews.replace(r'[kKmM]+$', '', regex=True).astype(float) * \
-                    dataframe.Reviews.str.extract(r'[\d\.]+([kKmM]+)', expand=False)
-                    .fillna(1)
-                    .replace(['k','m'], [10**3, 10**6]).astype(int))
-
-
-                """
-                size = dataframe[dataframe.columns[0]].count()
-                print(dataframe)
-                for i in range(size):
-                    # (df.Val.replace(r'[KM]+$', '', regex=True).astype(float) * df.Val.str.extract(r'[\d\.]+([KM]+)', expand=False).fillna(1).replace(['K','M'], [10**3, 10**6]).astype(int))
-                    
-                    
-                    value = dataframe.iloc[i, 2]
-                    string_value = (value.split()[0])[1:]
-                    # dataframe.iloc[i, 2] = string_value
-                    # string_value.replace({'k': '*1e3', 'm': '*1e6'}, regex=True).map(pd.eval).astype(int)
-                    print(string_value)
-                print(dataframe.Reviews.to_string(index=False))
-                dataframe['Reviews'].replace({'[kK]': '*1e3', 'm': '*1e6'}, regex=True)
-
-                # dataframe = dataframe.sort_values(by='Reviews', ascending=False, key=lambda x: np.argsort(index_natsorted(dataframe["Reviews"])))
-                # dataframe = dataframe.sort_values(by = "Reviews", ascending=False)
-                """
-                print(dataframe.Reviews.to_string(index=False))
-                dataframe = dataframe.reset_index(drop=True)
-                dataframe.index += 1
-                print(dataframe)
-
-
+                sort_most_reviewed(dataframe)
 
         elif(selection == 2):
             '''Selection 2 allows the user to display the popular items from desired store'''
-            export_results(raw_data)
-            store_number = input("Select Store Number: ")
-            store_number = int(store_number)
-            print("\n", dataframe.iloc[[store_number-1]])
-            store_url = raw_data['URLS'][store_number-1]
-            print("Retrieving List... ")
-            fetched_url = requests.get(store_url)
-            beautifulsoup = BeautifulSoup(fetched_url.text, "html.parser")
-            print("\nPopular Items: ")
-            counter = 1
-            for item in beautifulsoup.find_all('p', 'css-nyjpex'):
-                print(str(counter)+ ":", item.get_text())
-                counter += 1
+            store_popular_items(raw_data, dataframe)
+
         elif(selection == 3):
-            location = user_input("city")
-            fetched_url = requests.get(build_url(location))
-            beautifulsoup = BeautifulSoup(fetched_url.text, "html.parser")
+            '''Selection 3 allows the user to search for another city''' 
+            beautifulsoup = search_city_html()
             raw_data = store_data(beautifulsoup)
             dataframe = export_results(raw_data)
-            print("Exported!")
         else:
             dataframe.to_csv('Tea_Shop_List.csv', index=False)
+            print("Exported!")
         selection = user_selection()
     print("Goodbye!")
 
